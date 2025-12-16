@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Hand Mouse Pro</title>
+
+<style>
+html, body {
+    margin: 0;
+    overflow: hidden;
+    background: #0a0a0a;
+    font-family: Arial;
+}
+#cursor {
+    width: 22px;
+    height: 22px;
+    background: #00ffcc;
+    border-radius: 50%;
+    position: fixed;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 15px #00ffcc;
+}
+.draggable {
+    width: 120px;
+    height: 120px;
+    background: #ff5722;
+    position: absolute;
+    top: 40%;
+    left: 40%;
+    border-radius: 12px;
+}
+video {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+    width: 220px;
+    border-radius: 12px;
+}
+#info {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    color: #fff;
+}
+</style>
+</head>
+
+<body>
+
+<div id="info">🖐️ Hand Mouse PRO</div>
+<div class="draggable" id="box"></div>
+<div id="cursor"></div>
+<video id="video" autoplay muted></video>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.min.js"></script>
+
+<script>
+const video = document.getElementById("video");
+const cursor = document.getElementById("cursor");
+const box = document.getElementById("box");
+const info = document.getElementById("info");
+
+let smoothX = 0, smoothY = 0;
+let dragging = false;
+let dragTarget = null;
+let lastHandDistance = null;
+
+const hands = new Hands({
+  locateFile: (file) =>
+    `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${file}`
+});
+
+
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7,
+  selfieMode: true
+});
+
+hands.setOptions({
+  maxNumHands: 2,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7,
+  selfieMode: true
+});
+
+
+hands.onResults(res => {
+  if (!res.multiHandLandmarks) return;
+
+  /* ---------- ONE HAND = CURSOR ---------- */
+  const hand1 = res.multiHandLandmarks[0];
+if (!hand1 || hand1.length < 9) return;
+
+const index = hand1[8];
+const thumb = hand1[4];
+
+
+  let x = index.x * window.innerWidth;
+  let y = index.y * window.innerHeight;
+
+  smoothX += (x - smoothX) * 0.25;
+  smoothY += (y - smoothY) * 0.25;
+
+  cursor.style.left = smoothX + "px";
+  cursor.style.top = smoothY + "px";
+
+  const pinchDist = Math.hypot(index.x - thumb.x, index.y - thumb.y);
+
+  /* ---------- DRAG & DROP ---------- */
+  if (pinchDist < 0.04 && !dragging) {
+    dragging = true;
+  const el = document.elementFromPoint(smoothX, smoothY);
+dragTarget = el === box ? box : null;
+
+  }
+
+  if (dragging && dragTarget === box) {
+    box.style.left = smoothX - 60 + "px";
+    box.style.top = smoothY - 60 + "px";
+  }
+
+  if (pinchDist > 0.06) {
+    dragging = false;
+    dragTarget = null;
+  }
+
+  /* ---------- TWO HAND GESTURE ---------- */
+  if (res.multiHandLandmarks.length === 2) {
+    const h1 = res.multiHandLandmarks[0][0];
+    const h2 = res.multiHandLandmarks[1][0];
+
+    const dist = Math.hypot(h1.x - h2.x, h1.y - h2.y);
+
+    if (lastHandDistance) {
+      const zoom = dist > lastHandDistance ? "ZOOM IN 🔍" : "ZOOM OUT 🔎";
+      info.textContent = `Two Hands: ${zoom}`;
+    }
+
+    lastHandDistance = dist;
+  } else {
+    lastHandDistance = null;
+    info.textContent = "🖐️ Hand Mouse PRO";
+  }
+});
+
+const camera = new Camera(video, {
+  onFrame: async () => await hands.send({ image: video }),
+  width: 640,
+  height: 480
+});
+
+camera.start();
+</script>
+
+</body>
+</html>
